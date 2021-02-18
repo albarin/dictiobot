@@ -8,10 +8,17 @@ import (
 
 	"github.com/albarin/dictiobot/pkg/words"
 
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"gopkg.in/tucnak/telebot.v2"
 )
 
 func main() {
+	app, err := newrelic.NewApplication(
+		newrelic.ConfigAppName("dictiobot"),
+		newrelic.ConfigLicense("eu01xx28762fd7c39591cf3624e950bbd61eNRAL"),
+		newrelic.ConfigDistributedTracerEnabled(true),
+	)
+
 	webhook := &telebot.Webhook{
 		Listen: ":" + os.Getenv("PORT"),
 		Endpoint: &telebot.WebhookEndpoint{
@@ -36,7 +43,16 @@ func main() {
 		http.DefaultClient,
 	)
 
-	bot.Handle(telebot.OnQuery, func(q *telebot.Query) {
+	bot.Handle(telebot.OnQuery, onQueryHandler(bot, api, app))
+
+	bot.Start()
+}
+
+func onQueryHandler(bot *telebot.Bot, api *words.API, app *newrelic.Application) func(q *telebot.Query) {
+	return func(q *telebot.Query) {
+		txn := app.StartTransaction("query request")
+		defer txn.End()
+
 		word := q.Text
 
 		definitions, err := api.Word(word)
@@ -53,9 +69,7 @@ func main() {
 		if err != nil {
 			log.Println(err)
 		}
-	})
-
-	bot.Start()
+	}
 }
 
 func createResult(word string, def words.Result, i int) *telebot.ArticleResult {
