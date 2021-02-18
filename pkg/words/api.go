@@ -6,19 +6,23 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type API struct {
-	token   string
-	baseURL string
-	client  *http.Client
+	token       string
+	baseURL     string
+	client      *http.Client
+	newRelicApp *newrelic.Application
 }
 
-func New(baseURL, token string, client *http.Client) *API {
+func New(baseURL, token string, client *http.Client, app *newrelic.Application) *API {
 	return &API{
-		token:   token,
-		baseURL: baseURL,
-		client:  client,
+		token:       token,
+		baseURL:     baseURL,
+		client:      client,
+		newRelicApp: app,
 	}
 }
 
@@ -67,6 +71,9 @@ func escape(s string) string {
 }
 
 func (api *API) Word(word string) ([]Result, error) {
+	txn := api.newRelicApp.StartTransaction("wordsapi-request")
+	defer txn.End()
+
 	url := fmt.Sprintf("%s/%s", api.baseURL, word)
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -76,8 +83,11 @@ func (api *API) Word(word string) ([]Result, error) {
 
 	req.Header.Add("x-rapidapi-key", api.token)
 
+	seg := newrelic.StartExternalSegment(txn, req)
+	defer seg.End()
 	res, err := api.client.Do(req)
 	if err != nil {
+		txn.NoticeError(err)
 		return nil, err
 	}
 

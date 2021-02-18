@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/albarin/dictiobot/pkg/words"
 
@@ -18,6 +19,10 @@ func main() {
 		newrelic.ConfigLicense("eu01xx28762fd7c39591cf3624e950bbd61eNRAL"),
 		newrelic.ConfigDistributedTracerEnabled(true),
 	)
+	if err != nil {
+		log.Fatalf("error initializing newrelic: %s", err)
+		return
+	}
 
 	webhook := &telebot.Webhook{
 		Listen: ":" + os.Getenv("PORT"),
@@ -41,19 +46,22 @@ func main() {
 		"https://wordsapiv1.p.rapidapi.com/words",
 		os.Getenv("WORDSAPI_TOKEN"),
 		http.DefaultClient,
+		app,
 	)
 
 	bot.Handle(telebot.OnQuery, onQueryHandler(bot, api, app))
 
 	bot.Start()
+
+	app.Shutdown(10 * time.Second)
 }
 
 func onQueryHandler(bot *telebot.Bot, api *words.API, app *newrelic.Application) func(q *telebot.Query) {
 	return func(q *telebot.Query) {
-		txn := app.StartTransaction("onQueryHandler")
-		defer txn.End()
-
 		word := q.Text
+		app.RecordCustomEvent("onQuery", map[string]interface{}{
+			"word": word,
+		})
 
 		definitions, err := api.Word(word)
 		if err != nil {
