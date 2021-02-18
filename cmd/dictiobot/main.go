@@ -50,7 +50,7 @@ func main() {
 
 func onQueryHandler(bot *telebot.Bot, api *words.API, app *newrelic.Application) func(q *telebot.Query) {
 	return func(q *telebot.Query) {
-		txn := app.StartTransaction("query request")
+		txn := app.StartTransaction("onQueryHandler")
 		defer txn.End()
 
 		word := q.Text
