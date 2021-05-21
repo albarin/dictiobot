@@ -16,7 +16,7 @@ import (
 func main() {
 	app, err := newrelic.NewApplication(
 		newrelic.ConfigAppName("dictiobot"),
-		newrelic.ConfigLicense("eu01xx28762fd7c39591cf3624e950bbd61eNRAL"),
+		newrelic.ConfigLicense(os.Getenv("NEW_RELIC_TOKEN")),
 		newrelic.ConfigDistributedTracerEnabled(true),
 	)
 	if err != nil {
